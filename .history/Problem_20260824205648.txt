@@ -16,7 +16,6 @@ The business retries at the wrong time or never contacts them
 
 The customer may still want the service—but the business marks them as “churned” and loses their future revenue. This is called involuntary churn: a customer is lost due to payment failure, not an intentional cancellation. In subscription businesses, involuntary churn is often estimated at 20–40% of total churn.
 
-
 Why current methods fail
 Most small and mid-sized businesses handle recovery poorly:
 
