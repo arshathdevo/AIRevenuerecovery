@@ -1,0 +1,78 @@
+The problem in :
+
+Imagine a user has a ₹999/month subscription for a learning app, SaaS tool, gym, or streaming service. Their payment fails because:
+
+Their card expired or was replaced
+
+They temporarily have insufficient balance
+
+The bank declines a valid transaction
+
+A network/payment-gateway error occurs
+
+Their UPI/autopay mandate fails
+
+The business retries at the wrong time or never contacts them
+
+The customer may still want the service—but the business marks them as “churned” and loses their future revenue. This is called involuntary churn: a customer is lost due to payment failure, not an intentional cancellation. In subscription businesses, involuntary churn is often estimated at 20–40% of total churn.
+
+
+Why current methods fail
+Most small and mid-sized businesses handle recovery poorly:
+
+They use the same retry rule for every failed payment.
+
+They send generic reminders such as “Your payment failed.”
+
+They do not distinguish a temporary failure from a permanently invalid card.
+
+They fail to prioritize high-value customers or customers most likely to pay after a reminder.
+
+Finance, customer support, and payment data live in separate tools.
+
+They cannot easily see how much revenue is at risk, recovered, or permanently lost.
+
+For example, retrying a payment immediately after an “insufficient funds” decline may fail again; retrying when the customer is more likely to have funds, or sending a simple payment-update link, could recover that revenue. Permanent issues such as a stolen, closed, or invalid card should not be retried repeatedly.
+
+"A business was supposed to receive money, but something went wrong. Can our AI find that lost revenue and actually bring it back?"
+
+Phase 1 — Product thinking
+
+Understand the exact customer and revenue-loss problem.
+
+Phase 2 — Define the MVP
+
+Decide exactly what our first version will recover.
+
+Phase 3 — Data
+
+Design realistic transaction/payment data for our system.
+
+Phase 4 — AI
+
+Design the decision-making and agent workflow.
+
+Phase 5 — Razorpay
+
+Integrate the relevant Razorpay capabilities.
+
+Phase 6 — Backend
+
+Build the recovery engine.
+
+Phase 7 — Frontend
+
+Build the dashboard.
+
+Phase 8 — Safety
+
+Add policies, stopping rules and audit trails.
+
+Phase 9 — Measurement
+
+Calculate actual recovery metrics.
+
+Phase 10 — Demo
+
+Create a convincing "₹ at risk → AI intervention → ₹ recovered" demonstration.
+
