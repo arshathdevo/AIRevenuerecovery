@@ -96,37 +96,4 @@ class Payment(BaseModel):
     status: PaymentStatus
     created_at: datetime = Field(default_factory=datetime.utcnow)    
 
-class CustomerIntent(str, Enum):
-    WILLING_TO_PAY = "WILLING_TO_PAY"
-    DELAYING_PAYMENT = "DELAYING_PAYMENT"
-    FINANCIAL_DIFFICULTY = "FINANCIAL_DIFFICULTY"
-    DISPUTE = "DISPUTE"
-    SECURITY_CONCERN = "SECURITY_CONCERN"
-    UNKNOWN = "UNKNOWN"
-
-
-class ProblemType(str, Enum):
-    TECHNICAL = "TECHNICAL"
-    CHECKOUT_ABANDONMENT = "CHECKOUT_ABANDONMENT"
-    FINANCIAL = "FINANCIAL"
-    TIMING = "TIMING"
-    AUTHENTICATION = "AUTHENTICATION"
-    SECURITY_ACCESS = "SECURITY_ACCESS"
-    DISPUTE = "DISPUTE"
-    UNKNOWN = "UNKNOWN"
-
-
-class RecoveryAction(str, Enum):
-    OFFER_RETRY = "OFFER_RETRY"
-    SEND_REMINDER = "SEND_REMINDER"
-    SCHEDULE_REMINDER = "SCHEDULE_REMINDER"
-    OFFER_ALTERNATE_PAYMENT = "OFFER_ALTERNATE_PAYMENT"
-    HUMAN_ESCALATION = "HUMAN_ESCALATION"
-    STOP_RECOVERY = "STOP_RECOVERY"
-
-
-class AIDiagnosis(BaseModel):
-    problem_type: ProblemType
-    customer_intent: CustomerIntent
-    recommended_action: RecoveryAction
-    explanation: str    
+    
