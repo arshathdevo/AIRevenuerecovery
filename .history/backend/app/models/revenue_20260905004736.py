@@ -184,9 +184,18 @@ class AIDiagnosis(BaseModel):
     recommended_action: RecoveryAction
     explanation: str
 
-    # AI decision metadata
+    # Additional AI decision metadata.
+    #
+    # These fields are useful for:
+    # - AI decision making
+    # - Merchant dashboard
+    # - Audit logs
+    # - Recovery priority calculation
+    # - Judge-facing AI reasoning
+    # - Automated safety checks
+
     willingness_to_pay: bool = False
-    delay_signal: bool = False
+
     sensitive: bool = False
+
     contradiction: bool = False
-    

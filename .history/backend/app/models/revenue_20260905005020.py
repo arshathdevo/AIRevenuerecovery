@@ -178,15 +178,3 @@ class RecoveryAction(str, Enum):
 # AI DIAGNOSIS
 # ============================================================
 
-class AIDiagnosis(BaseModel):
-    problem_type: ProblemType
-    customer_intent: CustomerIntent
-    recommended_action: RecoveryAction
-    explanation: str
-
-    # AI decision metadata
-    willingness_to_pay: bool = False
-    delay_signal: bool = False
-    sensitive: bool = False
-    contradiction: bool = False
-    

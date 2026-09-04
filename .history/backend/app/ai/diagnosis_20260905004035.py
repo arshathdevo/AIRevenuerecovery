@@ -10,7 +10,7 @@ from app.models.revenue import (
 
 
 # ============================================================
-# 1. PATTERN DATA STRUCTURES
+# 1. DATA STRUCTURES
 # ============================================================
 
 @dataclass(frozen=True)
@@ -32,6 +32,7 @@ class Evidence:
 
 CONTRACTIONS = {
     "can't": "cannot",
+    "cannot": "cannot",
     "won't": "will not",
     "wouldn't": "would not",
     "couldn't": "could not",
@@ -67,20 +68,27 @@ CONTRACTIONS = {
 
 def normalize_text(text: str) -> str:
     """
-    Normalize text for deterministic analysis.
+    Normalize user text before analysis.
+
+    Steps:
+    1. Convert to lowercase.
+    2. Expand common contractions.
+    3. Remove punctuation.
+    4. Collapse repeated whitespace.
 
     Example:
-        I don't have enough money.
+        "I don't have enough money."
         ->
-        i do not have enough money
+        "i do not have enough money"
     """
 
-    if not isinstance(text, str):
+    if not text:
         return ""
 
     text = text.lower().strip()
 
     # Expand contractions.
+    # Sort longest first so multi-character forms are handled safely.
     for contraction, replacement in sorted(
         CONTRACTIONS.items(),
         key=lambda item: len(item[0]),
@@ -102,11 +110,12 @@ def normalize_text(text: str) -> str:
 
 
 # ============================================================
-# 3. SENSITIVE INFORMATION
+# 3. SENSITIVE INFORMATION DETECTION
 # ============================================================
 
 SENSITIVE_PATTERNS = [
     r"\bupi\s*pin\b",
+    r"\bpin\b",
     r"\botp\b",
     r"\bone\s*time\s*password\b",
     r"\bcvv\b",
@@ -120,7 +129,9 @@ SENSITIVE_PATTERNS = [
 
 def contains_sensitive_information(text: str) -> bool:
     """
-    Detect potentially sensitive credentials/payment information.
+    Detect potentially sensitive payment/authentication information.
+
+    We intentionally err on the safe side.
     """
 
     normalized = normalize_text(text)
@@ -129,7 +140,9 @@ def contains_sensitive_information(text: str) -> bool:
         if re.search(pattern, normalized):
             return True
 
-    # Long numeric values can represent sensitive credentials.
+    # Detect long numeric sequences.
+    # This prevents users from accidentally submitting card/account-like
+    # numeric information to the recovery agent.
     if re.search(r"\b\d{6,}\b", normalized):
         return True
 
@@ -138,7 +151,7 @@ def contains_sensitive_information(text: str) -> bool:
 
 def redact_sensitive_information(text: str) -> str:
     """
-    Redact sensitive values from a message.
+    Replace detected sensitive information with [REDACTED].
     """
 
     if not text:
@@ -146,6 +159,8 @@ def redact_sensitive_information(text: str) -> str:
 
     redacted = text
 
+    # Redact explicit sensitive keywords and the value following them
+    # when it looks like a credential.
     redacted = re.sub(
         r"(?i)\bupi\s*pin\b\s*[:\-]?\s*\d+",
         "[REDACTED]",
@@ -236,11 +251,8 @@ TECHNICAL_PATTERNS = [
 
 
 CHECKOUT_PATTERNS = [
-    Pattern("forgot to complete the payment", 1.00),
     Pattern("forgot to complete payment", 1.00),
-    Pattern("forgot to finish the payment", 1.00),
     Pattern("forgot to finish payment", 1.00),
-
     Pattern("forgot to make payment", 1.00),
     Pattern("forgot payment", 1.00),
     Pattern("forgot to pay", 1.00),
@@ -248,10 +260,7 @@ CHECKOUT_PATTERNS = [
     Pattern("did not complete payment", 1.00),
     Pattern("did not finish payment", 1.00),
 
-    Pattern("closed the payment page", 1.00),
     Pattern("closed payment page", 1.00),
-
-    Pattern("closed the checkout page", 1.00),
     Pattern("closed checkout page", 1.00),
 
     Pattern("left payment page", 0.95),
@@ -266,6 +275,10 @@ CHECKOUT_PATTERNS = [
 
 
 FINANCIAL_PATTERNS = [
+    # Important:
+    # These explicit forms are required because contraction normalization
+    # changes "I don't have enough money" into
+    # "i do not have enough money".
     Pattern("do not have enough money", 1.00),
     Pattern("do not have enough funds", 1.00),
     Pattern("do not have money", 0.95),
@@ -286,7 +299,6 @@ FINANCIAL_PATTERNS = [
 
     Pattern("money problem", 0.95),
     Pattern("money issue", 0.95),
-
     Pattern("cash problem", 0.95),
     Pattern("cash issue", 0.95),
 
@@ -297,7 +309,6 @@ FINANCIAL_PATTERNS = [
     Pattern("waiting for salary", 1.00),
     Pattern("until salary comes", 1.00),
     Pattern("until salary arrives", 1.00),
-
     Pattern("salary comes", 0.95),
     Pattern("salary arrives", 0.95),
 ]
@@ -326,20 +337,14 @@ TIMING_PATTERNS = [
 
 
 AUTHENTICATION_PATTERNS = [
-    Pattern("forgot my upi pin", 1.00),
     Pattern("forgot upi pin", 1.00),
-
-    Pattern("forgot my pin", 1.00),
     Pattern("forgot pin", 1.00),
 
-    Pattern("account is locked", 1.00),
     Pattern("account locked", 1.00),
-
     Pattern("locked out", 1.00),
 
     Pattern("cannot log in", 1.00),
     Pattern("cannot login", 1.00),
-
     Pattern("unable to log in", 1.00),
     Pattern("unable to login", 1.00),
 
@@ -354,7 +359,6 @@ AUTHENTICATION_PATTERNS = [
 SECURITY_PATTERNS = [
     Pattern("phone was stolen", 1.00),
     Pattern("phone stolen", 1.00),
-
     Pattern("lost my phone", 1.00),
     Pattern("phone is lost", 1.00),
 
@@ -386,17 +390,14 @@ DISPUTE_PATTERNS = [
     Pattern("duplicate payment", 1.00),
 
     Pattern("do not recognize payment", 1.00),
-    Pattern("do not recognize this payment", 1.00),
-
     Pattern("unrecognized payment", 1.00),
     Pattern("unknown payment", 0.95),
-
     Pattern("fraudulent payment", 1.00),
 ]
 
 
 # ============================================================
-# 5. CUSTOMER INTENT PATTERNS
+# 5. INTENT PATTERNS
 # ============================================================
 
 POSITIVE_WILLINGNESS_PATTERNS = [
@@ -406,13 +407,11 @@ POSITIVE_WILLINGNESS_PATTERNS = [
 
     Pattern("i will pay", 1.00),
     Pattern("i can pay", 1.00),
-
     Pattern("i can make payment", 1.00),
     Pattern("i will make payment", 1.00),
 
     Pattern("i will try again", 1.00),
     Pattern("i will retry", 1.00),
-
     Pattern("i can retry", 1.00),
     Pattern("i want to retry", 1.00),
 
@@ -421,7 +420,7 @@ POSITIVE_WILLINGNESS_PATTERNS = [
 
     Pattern("i am willing to pay", 1.00),
     Pattern("i am ready to pay", 1.00),
-
+    Pattern("i am ready", 0.90),
     Pattern("ready to pay", 1.00),
     Pattern("happy to pay", 1.00),
 ]
@@ -481,24 +480,22 @@ def _is_negated_at(
     phrase: str | None = None,
 ) -> bool:
     """
-    Determine whether an evidence phrase is actually negated.
+    Detect phrase-aware negation.
 
-    This function is intentionally conservative.
+    IMPORTANT:
+    We do NOT treat every occurrence of "not" before a phrase
+    as negation.
 
-    We DO NOT simply search for the word "not".
-
-    Examples:
+    Example:
 
         "bank app is not working"
-        -> NOT negated
-        -> technical evidence remains valid
+        -> technical evidence is valid
 
         "I do not have a bank problem"
-        -> "bank problem" IS negated
+        -> bank problem is negated
 
-        "I don't recognize this payment"
-        -> dispute evidence is NOT negated
-        -> "do not recognize" is itself the dispute phrase
+    This prevents broad negation from destroying legitimate
+    technical evidence.
     """
 
     normalized = normalize_text(text)
@@ -513,51 +510,23 @@ def _is_negated_at(
     if not words:
         return False
 
-    recent = " ".join(words[-10:])
+    # Only inspect the recent context.
+    recent = " ".join(words[-8:])
 
-    # --------------------------------------------------------
-    # IMPORTANT EXCEPTION
-    # --------------------------------------------------------
-    #
-    # "do not recognize payment" is NOT a negation.
-    #
-    # It means the customer does not recognize the payment,
-    # which is itself a dispute signal.
-    #
-    if phrase:
-        normalized_phrase = normalize_text(phrase)
-
-        if (
-            normalized_phrase.startswith("do not recognize")
-            or normalized_phrase.startswith("cannot recognize")
-            or normalized_phrase.startswith("unable to recognize")
-        ):
-            return False
-
-    # --------------------------------------------------------
-    # "do not have ..."
-    # --------------------------------------------------------
-    #
-    # Handles:
-    #
-    # "I do not have a bank problem"
-    # "I do not have any bank problem"
-    # "I do not have any problem with my bank app"
-    #
+    # "I do not have ..."
     if re.search(
         r"\b(?:do|does|did)\s+not\s+have"
-        r"(?:\s+(?:a|an|any|the))?"
-        r"\s*$",
+        r"(?:\s+any)?\s*$",
         recent,
     ):
         return True
 
-    # "no bank problem"
+    # "no ..."
     if re.search(r"\bno\s*$", recent):
         return True
 
-    # "without a bank problem"
-    if re.search(r"\bwithout(?:\s+(?:a|an|any|the))?\s*$", recent):
+    # "without ..."
+    if re.search(r"\bwithout\s*$", recent):
         return True
 
     # "never ..."
@@ -572,7 +541,7 @@ def _pattern_matches(
     pattern: Pattern,
 ) -> bool:
     """
-    Determine whether a pattern has valid evidence.
+    Check whether a pattern appears without being explicitly negated.
     """
 
     occurrences = _find_phrase_occurrences(
@@ -604,9 +573,7 @@ def _collect_evidence(
     evidence: list[Evidence] = []
 
     for pattern in patterns:
-
         if _pattern_matches(text, pattern):
-
             evidence.append(
                 Evidence(
                     category=category,
@@ -616,6 +583,19 @@ def _collect_evidence(
             )
 
     return evidence
+
+
+def _best_evidence(
+    evidence: list[Evidence],
+) -> Evidence | None:
+
+    if not evidence:
+        return None
+
+    return max(
+        evidence,
+        key=lambda item: item.weight,
+    )
 
 
 # ============================================================
@@ -679,14 +659,16 @@ def _classify_problem(
         if not evidence:
             continue
 
+        # Strongest evidence determines the category.
         score = max(
             item.weight
             for item in evidence
         )
 
-        # Multiple independent signals increase confidence.
+        # Number of independent matching signals provides
+        # a small confidence bonus.
         if len(evidence) >= 2:
-            score = min(score + 0.10, 1.00)
+            score = min(score + 0.10, 1.0)
 
         if score > best_score:
             best_score = score
@@ -705,7 +687,6 @@ def _classify_problem(
 # ============================================================
 
 def _has_positive_willingness(text: str) -> bool:
-
     return any(
         _pattern_matches(text, pattern)
         for pattern in POSITIVE_WILLINGNESS_PATTERNS
@@ -713,7 +694,6 @@ def _has_positive_willingness(text: str) -> bool:
 
 
 def _has_negative_willingness(text: str) -> bool:
-
     return any(
         _pattern_matches(text, pattern)
         for pattern in NEGATIVE_WILLINGNESS_PATTERNS
@@ -721,7 +701,6 @@ def _has_negative_willingness(text: str) -> bool:
 
 
 def _has_delay_signal(text: str) -> bool:
-
     return any(
         _pattern_matches(text, pattern)
         for pattern in DELAY_PATTERNS
@@ -730,100 +709,53 @@ def _has_delay_signal(text: str) -> bool:
 
 def _classify_intent(
     text: str,
-) -> tuple[CustomerIntent, float, bool, bool, bool]:
-    """
-    Returns:
-
-        intent
-        confidence
-        contradiction
-        willingness_to_pay
-    """
+) -> tuple[CustomerIntent, float, bool]:
 
     positive = _has_positive_willingness(text)
     negative = _has_negative_willingness(text)
     delay = _has_delay_signal(text)
 
-    # --------------------------------------------------------
-    # CONTRADICTION
-    # --------------------------------------------------------
-
+    # Contradiction is intentionally detected before everything else.
     if positive and negative:
-
         return (
-        CustomerIntent.UNKNOWN,
-        1.00,
-        True,
-        False,
-        delay,
-)
-
-    # --------------------------------------------------------
-    # DELAY + WILLINGNESS
-    # --------------------------------------------------------
-
-    if delay and positive:
-
-        return (
-            CustomerIntent.DELAYING_PAYMENT,
-            1.00,
-            False,
+            CustomerIntent.UNKNOWN,
+            1.0,
             True,
-            delay,
         )
 
-    # --------------------------------------------------------
-    # DELAY ONLY
-    # --------------------------------------------------------
+    # Financial/delay intent is handled here only as linguistic intent.
+    if delay and positive:
+        return (
+            CustomerIntent.DELAYING_PAYMENT,
+            1.0,
+            False,
+        )
 
     if delay:
-
         return (
             CustomerIntent.DELAYING_PAYMENT,
             0.90,
             False,
-            False,
-            delay,
         )
-
-    # --------------------------------------------------------
-    # WILLINGNESS
-    # --------------------------------------------------------
 
     if positive:
-
         return (
             CustomerIntent.WILLING_TO_PAY,
-            1.00,
+            1.0,
             False,
-            True,
-            delay,
         )
-
-    # --------------------------------------------------------
-    # NEGATIVE WILLINGNESS
-    # --------------------------------------------------------
 
     if negative:
-
         return (
             CustomerIntent.UNKNOWN,
-            1.00,
+            1.0,
             False,
-            False,
-            delay,
         )
-
-    # --------------------------------------------------------
-    # UNKNOWN
-    # --------------------------------------------------------
 
     return (
         CustomerIntent.UNKNOWN,
-        0.00,
+        0.0,
         False,
-        False,
-        delay,
     )
 
 
@@ -835,6 +767,7 @@ def _select_recovery_action(
     problem_type: ProblemType,
     customer_intent: CustomerIntent,
     problem_confidence: float,
+    intent_confidence: float,
     contradiction: bool,
     sensitive: bool,
 ) -> RecoveryAction:
@@ -853,50 +786,26 @@ def _select_recovery_action(
         return RecoveryAction.HUMAN_ESCALATION
 
     # --------------------------------------------------------
-    # DISPUTES
+    # PROBLEM-SPECIFIC POLICY
     # --------------------------------------------------------
 
     if problem_type == ProblemType.DISPUTE:
         return RecoveryAction.STOP_RECOVERY
 
-    # --------------------------------------------------------
-    # SECURITY
-    # --------------------------------------------------------
-
     if problem_type == ProblemType.SECURITY_ACCESS:
         return RecoveryAction.HUMAN_ESCALATION
-
-    # --------------------------------------------------------
-    # AUTHENTICATION
-    # --------------------------------------------------------
 
     if problem_type == ProblemType.AUTHENTICATION:
         return RecoveryAction.HUMAN_ESCALATION
 
-    # --------------------------------------------------------
-    # FINANCIAL
-    # --------------------------------------------------------
-
     if problem_type == ProblemType.FINANCIAL:
         return RecoveryAction.HUMAN_ESCALATION
-
-    # --------------------------------------------------------
-    # TIMING
-    # --------------------------------------------------------
 
     if problem_type == ProblemType.TIMING:
         return RecoveryAction.SCHEDULE_REMINDER
 
-    # --------------------------------------------------------
-    # CHECKOUT
-    # --------------------------------------------------------
-
     if problem_type == ProblemType.CHECKOUT_ABANDONMENT:
         return RecoveryAction.OFFER_RETRY
-
-    # --------------------------------------------------------
-    # TECHNICAL
-    # --------------------------------------------------------
 
     if problem_type == ProblemType.TECHNICAL:
 
@@ -905,154 +814,45 @@ def _select_recovery_action(
 
         return RecoveryAction.OFFER_ALTERNATE_PAYMENT
 
-    # --------------------------------------------------------
-    # UNKNOWN
-    # --------------------------------------------------------
-
     return RecoveryAction.HUMAN_ESCALATION
 
 
 # ============================================================
-# 11. EXPLANATION GENERATOR
-# ============================================================
-
-def _build_explanation(
-    problem_type: ProblemType,
-    customer_intent: CustomerIntent,
-    action: RecoveryAction,
-    sensitive: bool,
-    contradiction: bool,
-) -> str:
-
-    if sensitive:
-
-        return (
-            "The message contains potentially sensitive payment or "
-            "authentication information. The issue was diagnosed, but "
-            "automated recovery is blocked and human assistance is required."
-        )
-
-    if contradiction:
-
-        return (
-            "The customer expressed contradictory willingness to pay. "
-            "Automated recovery is stopped and human review is required."
-        )
-
-    if problem_type == ProblemType.UNKNOWN:
-
-        return (
-            "The message does not contain enough reliable evidence to "
-            "determine the customer's problem safely."
-        )
-
-    if problem_type == ProblemType.FINANCIAL:
-
-        return (
-            "The customer appears to be experiencing financial difficulty. "
-            "Automated payment pressure is not appropriate, so the case "
-            "should be escalated to a human."
-        )
-
-    if problem_type == ProblemType.DISPUTE:
-
-        return (
-            "The customer appears to dispute the payment. Recovery is "
-            "stopped to prevent inappropriate collection activity."
-        )
-
-    if problem_type == ProblemType.SECURITY_ACCESS:
-
-        return (
-            "The customer appears to have a security or access problem. "
-            "Human assistance is required."
-        )
-
-    if problem_type == ProblemType.AUTHENTICATION:
-
-        return (
-            "The customer appears to have an authentication problem. "
-            "Sensitive credentials must not be collected by the recovery "
-            "agent, so the case is escalated."
-        )
-
-    if problem_type == ProblemType.CHECKOUT_ABANDONMENT:
-
-        return (
-            "The customer started or intended to make the payment but "
-            "did not complete checkout. Offering a safe retry is appropriate."
-        )
-
-    if problem_type == ProblemType.TIMING:
-
-        return (
-            "The customer appears willing to pay later rather than refusing "
-            "payment. A scheduled reminder is appropriate."
-        )
-
-    if problem_type == ProblemType.TECHNICAL:
-
-        if customer_intent == CustomerIntent.WILLING_TO_PAY:
-
-            return (
-                "The customer reported a technical payment problem and "
-                "explicitly indicated willingness to pay. A retry is "
-                "appropriate."
-            )
-
-        return (
-            "The customer appears to have a technical payment problem. "
-            "Because willingness to pay is not explicit, an alternate "
-            "payment option is safer than assuming intent."
-        )
-
-    return (
-        "The customer message was analyzed using the recovery policy."
-    )
-
-
-# ============================================================
-# 12. MAIN DIAGNOSIS ENGINE
+# 11. MAIN ANALYSIS FUNCTION
 # ============================================================
 
 def analyze_message(text: str) -> AIDiagnosis:
     """
-    Main deterministic AI diagnosis pipeline.
+    Main deterministic AI diagnosis engine.
 
-        Raw message
+    Pipeline:
+
+        Raw Message
              ↓
         Normalize
              ↓
-        Sensitive detection
+        Sensitive Detection
              ↓
-        Problem classification
+        Problem Evidence
              ↓
-        Intent classification
+        Problem Classification
              ↓
-        Safety overrides
+        Intent Classification
              ↓
-        Recovery policy
+        Safety / Policy Engine
              ↓
-        Diagnosis result
+        Recovery Action
     """
 
     if not isinstance(text, str):
         raise TypeError("text must be a string")
 
-    # --------------------------------------------------------
-    # EMPTY MESSAGE
-    # --------------------------------------------------------
-
     if not text.strip():
-
         return AIDiagnosis(
             problem_type=ProblemType.UNKNOWN,
             customer_intent=CustomerIntent.UNKNOWN,
             recommended_action=RecoveryAction.HUMAN_ESCALATION,
             explanation="No customer message was provided.",
-            willingness_to_pay=False,
-            sensitive=False,
-            contradiction=False,
         )
 
     normalized = normalize_text(text)
@@ -1063,21 +863,17 @@ def analyze_message(text: str) -> AIDiagnosis:
 
     sensitive = contains_sensitive_information(text)
 
-    # IMPORTANT:
-    #
-    # We DO NOT return here.
-    #
-    # We continue diagnosis so that:
-    #
-    # "I forgot my UPI PIN"
-    #
-    # becomes:
-    #
-    # AUTHENTICATION + SECURITY_CONCERN + sensitive=True
-    #
-    # rather than UNKNOWN.
-    #
-    # The policy engine will still force HUMAN_ESCALATION.
+    if sensitive:
+        return AIDiagnosis(
+            problem_type=ProblemType.UNKNOWN,
+            customer_intent=CustomerIntent.SECURITY_CONCERN,
+            recommended_action=RecoveryAction.HUMAN_ESCALATION,
+            explanation=(
+                "The message appears to contain sensitive payment or "
+                "authentication information. Automated recovery is stopped "
+                "for safety."
+            ),
+        )
 
     # --------------------------------------------------------
     # PROBLEM
@@ -1086,68 +882,55 @@ def analyze_message(text: str) -> AIDiagnosis:
     (
         problem_type,
         problem_confidence,
-        _problem_evidence,
+        problem_evidence,
     ) = _classify_problem(normalized)
 
     # --------------------------------------------------------
-    # INTENT
+    # CUSTOMER INTENT
     # --------------------------------------------------------
 
     (
         customer_intent,
-        _intent_confidence,
+        intent_confidence,
         contradiction,
-        willingness_to_pay,
     ) = _classify_intent(normalized)
 
     # --------------------------------------------------------
-    # PROBLEM-SPECIFIC INTENT OVERRIDES
+    # OVERRIDE INTENT BASED ON PROBLEM TYPE
     # --------------------------------------------------------
 
-    # Financial difficulty overrides normal willingness.
+    # Financial difficulty always wins over willingness.
     if problem_type == ProblemType.FINANCIAL:
-
         customer_intent = CustomerIntent.FINANCIAL_DIFFICULTY
+        intent_confidence = max(intent_confidence, 1.0)
 
-    # Payment disputes have their own intent.
+    # Dispute always means dispute intent.
     elif problem_type == ProblemType.DISPUTE:
-
         customer_intent = CustomerIntent.DISPUTE
+        intent_confidence = max(intent_confidence, 1.0)
 
-    # SECURITY_ACCESS specifically indicates a security concern.
-    elif problem_type == ProblemType.SECURITY_ACCESS:
-
+    # Security/authentication problems are security-related.
+    elif problem_type in {
+        ProblemType.SECURITY_ACCESS,
+        ProblemType.AUTHENTICATION,
+    }:
         customer_intent = CustomerIntent.SECURITY_CONCERN
+        intent_confidence = max(intent_confidence, 1.0)
 
-    # Authentication is slightly different.
-    #
-    # "I forgot my UPI PIN."
-    # -> security concern
-    #
-    # "My account is locked and I cannot log in."
-    # -> UNKNOWN according to our current test contract.
-    #
-    # Therefore only explicit credential/security situations force
-    # SECURITY_CONCERN here.
-    elif problem_type == ProblemType.AUTHENTICATION:
-
-        if sensitive:
-            customer_intent = CustomerIntent.SECURITY_CONCERN
-
-    # Contradiction always wins.
+    # Contradiction always overrides normal intent.
     if contradiction:
-
         customer_intent = CustomerIntent.UNKNOWN
-        willingness_to_pay = False
+        intent_confidence = 1.0
 
     # --------------------------------------------------------
-    # POLICY
+    # RECOVERY POLICY
     # --------------------------------------------------------
 
     action = _select_recovery_action(
         problem_type=problem_type,
         customer_intent=customer_intent,
         problem_confidence=problem_confidence,
+        intent_confidence=intent_confidence,
         contradiction=contradiction,
         sensitive=sensitive,
     )
@@ -1156,48 +939,86 @@ def analyze_message(text: str) -> AIDiagnosis:
     # EXPLANATION
     # --------------------------------------------------------
 
-    explanation = _build_explanation(
-        problem_type=problem_type,
-        customer_intent=customer_intent,
-        action=action,
-        sensitive=sensitive,
-        contradiction=contradiction,
-    )
+    if contradiction:
+        explanation = (
+            "The customer expressed contradictory willingness to pay. "
+            "Automated recovery is stopped and human review is required."
+        )
 
-    # --------------------------------------------------------
-    # FINAL STRUCTURED RESULT
-    # --------------------------------------------------------
+    elif problem_type == ProblemType.UNKNOWN:
+        explanation = (
+            "The message does not contain enough reliable evidence to "
+            "determine the customer's problem safely."
+        )
+
+    elif problem_type == ProblemType.FINANCIAL:
+        explanation = (
+            "The customer appears to be experiencing financial difficulty. "
+            "Automated payment pressure is not appropriate, so the case "
+            "should be escalated to a human."
+        )
+
+    elif problem_type == ProblemType.DISPUTE:
+        explanation = (
+            "The customer appears to dispute the payment. Recovery is "
+            "stopped to prevent inappropriate collection activity."
+        )
+
+    elif problem_type == ProblemType.SECURITY_ACCESS:
+        explanation = (
+            "The customer appears to have a security or access problem. "
+            "Human assistance is required."
+        )
+
+    elif problem_type == ProblemType.AUTHENTICATION:
+        explanation = (
+            "The customer appears to have an authentication problem. "
+            "Sensitive credentials must not be collected by the recovery "
+            "agent, so the case is escalated."
+        )
+
+    elif problem_type == ProblemType.CHECKOUT_ABANDONMENT:
+        explanation = (
+            "The customer started or intended to make the payment but did "
+            "not complete checkout. Offering a safe retry is appropriate."
+        )
+
+    elif problem_type == ProblemType.TECHNICAL:
+
+        if customer_intent == CustomerIntent.WILLING_TO_PAY:
+            explanation = (
+                "The customer reported a technical payment problem and "
+                "explicitly indicated willingness to pay. A retry is "
+                "appropriate."
+            )
+        else:
+            explanation = (
+                "The customer appears to have a technical payment problem. "
+                "Because willingness to pay is not explicit, an alternate "
+                "payment option is safer than assuming intent."
+            )
+
+    elif problem_type == ProblemType.TIMING:
+        explanation = (
+            "The customer appears willing to pay later rather than refusing "
+            "payment. A scheduled reminder is appropriate."
+        )
+
+    else:
+        explanation = (
+            "The customer message was analyzed using the recovery policy."
+        )
 
     return AIDiagnosis(
         problem_type=problem_type,
         customer_intent=customer_intent,
         recommended_action=action,
         explanation=explanation,
-
-        # Diagnostic metadata.
-        willingness_to_pay=willingness_to_pay,
-        sensitive=sensitive,
-        contradiction=contradiction,
     )
 
 
 # ============================================================
-# 13. PUBLIC API ALIASES
-# ============================================================
-
-def diagnose_message(text: str) -> AIDiagnosis:
-    """
-    Public diagnosis API.
-
-    Kept as a wrapper around analyze_message() so both names
-    remain compatible with existing code and tests.
-    """
-
-    return analyze_message(text)
-
-
-# ============================================================
-# 14. LEGACY FUZZY MATCH FUNCTION
+# 12. BACKWARD-COMPATIBILITY HELPER
 # ============================================================
 
 def _fuzzy_phrase_match(
@@ -1206,12 +1027,31 @@ def _fuzzy_phrase_match(
     threshold: float = 0.85,
 ) -> bool:
     """
-    Fuzzy matching intentionally disabled in the core MVP.
+    Fuzzy matching is intentionally disabled in the core recovery path.
 
-    Payment recovery is safety-sensitive. False-positive fuzzy
-    matches can trigger inappropriate recovery actions.
+    Why?
 
-    Kept only for compatibility with older imports/tests.
+    Payment recovery is a safety-sensitive domain. A fuzzy match can
+    incorrectly interpret unrelated customer messages as payment problems.
+
+    The function remains here only for backwards compatibility with older
+    tests/imports.
     """
 
     return False
+
+
+# ============================================================
+# 13. BACKWARD-COMPATIBILITY API
+# ============================================================
+
+def diagnose_message(text: str) -> AIDiagnosis:
+    """
+    Backward-compatible public API.
+
+    Older parts of the project use diagnose_message(),
+    while the current diagnosis engine uses analyze_message().
+
+    Both intentionally use the same diagnosis pipeline.
+    """
+    return analyze_message(text)

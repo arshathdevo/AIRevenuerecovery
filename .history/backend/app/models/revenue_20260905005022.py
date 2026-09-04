@@ -189,4 +189,3 @@ class AIDiagnosis(BaseModel):
     delay_signal: bool = False
     sensitive: bool = False
     contradiction: bool = False
-    

@@ -811,7 +811,6 @@ def _classify_intent(
             1.00,
             False,
             False,
-            delay,
         )
 
     # --------------------------------------------------------
@@ -823,7 +822,6 @@ def _classify_intent(
         0.00,
         False,
         False,
-        delay,
     )
 
 

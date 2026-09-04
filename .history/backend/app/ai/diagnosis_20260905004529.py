@@ -730,7 +730,7 @@ def _has_delay_signal(text: str) -> bool:
 
 def _classify_intent(
     text: str,
-) -> tuple[CustomerIntent, float, bool, bool, bool]:
+) -> tuple[CustomerIntent, float, bool, bool]:
     """
     Returns:
 
@@ -751,12 +751,11 @@ def _classify_intent(
     if positive and negative:
 
         return (
-        CustomerIntent.UNKNOWN,
-        1.00,
-        True,
-        False,
-        delay,
-)
+            CustomerIntent.UNKNOWN,
+            1.00,
+            True,
+            False,
+        )
 
     # --------------------------------------------------------
     # DELAY + WILLINGNESS
@@ -769,7 +768,6 @@ def _classify_intent(
             1.00,
             False,
             True,
-            delay,
         )
 
     # --------------------------------------------------------
@@ -783,7 +781,6 @@ def _classify_intent(
             0.90,
             False,
             False,
-            delay,
         )
 
     # --------------------------------------------------------
@@ -797,7 +794,6 @@ def _classify_intent(
             1.00,
             False,
             True,
-            delay,
         )
 
     # --------------------------------------------------------
@@ -811,7 +807,6 @@ def _classify_intent(
             1.00,
             False,
             False,
-            delay,
         )
 
     # --------------------------------------------------------
@@ -823,7 +818,6 @@ def _classify_intent(
         0.00,
         False,
         False,
-        delay,
     )
 
 

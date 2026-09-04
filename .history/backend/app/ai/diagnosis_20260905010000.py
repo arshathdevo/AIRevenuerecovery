@@ -823,7 +823,7 @@ def _classify_intent(
         0.00,
         False,
         False,
-        delay,
+        delay
     )
 
 

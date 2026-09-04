@@ -4,9 +4,6 @@ from enum import Enum
 from pydantic import BaseModel, Field
 
 
-# ============================================================
-# REVENUE STATUS
-# ============================================================
 
 class RevenueStatus(str, Enum):
     EXPECTED = "EXPECTED"
@@ -17,10 +14,6 @@ class RevenueStatus(str, Enum):
     PARTIAL = "PARTIAL"
 
 
-# ============================================================
-# REVENUE PLAN FREQUENCY
-# ============================================================
-
 class Frequency(str, Enum):
     ONE_TIME = "ONE_TIME"
     DAILY = "DAILY"
@@ -28,16 +21,10 @@ class Frequency(str, Enum):
     MONTHLY = "MONTHLY"
     YEARLY = "YEARLY"
 
-
-# ============================================================
-# CUSTOMER
-# ============================================================
-
 class CustomerCreate(BaseModel):
     name: str
     email: str
     phone: str | None = None
-
 
 class Customer(BaseModel):
     customer_id: str
@@ -46,17 +33,17 @@ class Customer(BaseModel):
     phone: str | None = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-
-# ============================================================
-# REVENUE PLAN
-# ============================================================
-
 class RevenuePlanCreate(BaseModel):
     customer_id: str
     amount: float = Field(gt=0)
     frequency: Frequency
     start_date: date
 
+class RevenueObligationCreate(BaseModel):
+    customer_id: str
+    plan_id: str | None = None
+    expected_amount: float = Field(gt=0)
+    due_date: date    
 
 class RevenuePlan(BaseModel):
     plan_id: str
@@ -66,17 +53,6 @@ class RevenuePlan(BaseModel):
     start_date: date
     active: bool = True
     created_at: datetime = Field(default_factory=datetime.utcnow)
-
-
-# ============================================================
-# REVENUE OBLIGATION
-# ============================================================
-
-class RevenueObligationCreate(BaseModel):
-    customer_id: str
-    plan_id: str | None = None
-    expected_amount: float = Field(gt=0)
-    due_date: date
 
 
 class RevenueObligation(BaseModel):
@@ -97,15 +73,8 @@ class RevenueObligation(BaseModel):
 
     @property
     def remaining_amount(self) -> float:
-        return max(
-            self.expected_amount - self.received_amount,
-            0
-        )
+        return max(self.expected_amount - self.received_amount, 0)
 
-
-# ============================================================
-# PAYMENT
-# ============================================================
 
 class PaymentStatus(str, Enum):
     SUCCESS = "SUCCESS"
@@ -123,19 +92,9 @@ class Payment(BaseModel):
     payment_id: str
     revenue_id: str
     customer_id: str
-
     amount: float = Field(gt=0)
-
     status: PaymentStatus
-
-    created_at: datetime = Field(
-        default_factory=datetime.utcnow
-    )
-
-
-# ============================================================
-# AI CUSTOMER INTENT
-# ============================================================
+    created_at: datetime = Field(default_factory=datetime.utcnow)    
 
 class CustomerIntent(str, Enum):
     WILLING_TO_PAY = "WILLING_TO_PAY"
@@ -145,10 +104,6 @@ class CustomerIntent(str, Enum):
     SECURITY_CONCERN = "SECURITY_CONCERN"
     UNKNOWN = "UNKNOWN"
 
-
-# ============================================================
-# AI PROBLEM TYPE
-# ============================================================
 
 class ProblemType(str, Enum):
     TECHNICAL = "TECHNICAL"
@@ -161,10 +116,6 @@ class ProblemType(str, Enum):
     UNKNOWN = "UNKNOWN"
 
 
-# ============================================================
-# AI RECOVERY ACTION
-# ============================================================
-
 class RecoveryAction(str, Enum):
     OFFER_RETRY = "OFFER_RETRY"
     SEND_REMINDER = "SEND_REMINDER"
@@ -174,19 +125,22 @@ class RecoveryAction(str, Enum):
     STOP_RECOVERY = "STOP_RECOVERY"
 
 
-# ============================================================
-# AI DIAGNOSIS
-# ============================================================
-
 class AIDiagnosis(BaseModel):
+    problem_type: ProblemType
+    customer_intent: CustomerIntent
+    recommended_action: RecoveryAction
+    explanation: str    class AIDiagnosis(BaseModel):
     problem_type: ProblemType
     customer_intent: CustomerIntent
     recommended_action: RecoveryAction
     explanation: str
 
-    # AI decision metadata
+    # Additional AI decision metadata.
+    # These fields are useful for:
+    # - tests
+    # - merchant dashboard
+    # - audit logs
+    # - judge-facing AI reasoning
     willingness_to_pay: bool = False
-    delay_signal: bool = False
     sensitive: bool = False
     contradiction: bool = False
-    
